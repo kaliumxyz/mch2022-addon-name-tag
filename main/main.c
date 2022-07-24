@@ -9,12 +9,13 @@
 // native Badge apps on.
 
 #include "main.h"
+#include "rp2040.h"
 
 static pax_buf_t buf;
 xQueueHandle buttonQueue;
 
 #include <esp_log.h>
-static const char *TAG = "mch2022-demo-app";
+static const char *TAG = "addon-name-tag";
 
 // Updates the screen with the latest buffer.
 void disp_flush() {
@@ -30,7 +31,7 @@ void exit_to_launcher() {
 void app_main() {
   
     
-    ESP_LOGI(TAG, "Welcome to the template app!");
+    ESP_LOGI(TAG, "This is a nametag with working SOA");
 
     // Initialize the screen, the I2C and the SPI busses.
     bsp_init();
@@ -43,13 +44,20 @@ void app_main() {
     
     // Initialize graphics for the screen.
     pax_buf_init(&buf, NULL, 320, 240, PAX_BUF_16_565RGB);
-    
-    // Initialize NVS.
+
+     // Initialize NVS.
     nvs_flash_init();
-    
-    // Initialize WiFi. This doesn't connect to Wifi yet.
-    wifi_init();
-    
+
+    bool led = false;
+    bool didLedLastCycle = false;
+
+    RP2040* rp2040 = get_rp2040();
+    rp2040_set_gpio_dir(rp2040, 0, RP2040_REG_GPIO_OUT);
+    rp2040_set_gpio_dir(rp2040, 1, RP2040_REG_GPIO_OUT);
+
+    int ledMode = 0;
+
+
     while (1) {
         // Pick a random background color.
         int hue = esp_random() & 255;
@@ -96,6 +104,36 @@ void app_main() {
         if (message.input == RP2040_INPUT_BUTTON_HOME && message.state) {
             // If home is pressed, exit to launcher.
             exit_to_launcher();
+        }
+
+        if (message.input == RP2040_INPUT_BUTTON_SELECT && message.state) {
+            if (ledMode < 2) {
+                ledMode += 1;
+            }
+            else {
+                ledMode = 0;
+            }
+        }
+
+        switch (ledMode) {
+            case 0:
+                if (didLedLastCycle == false) {
+                    led = !led;
+                    rp2040_set_gpio_value(rp2040, 0, led);
+                    rp2040_set_gpio_value(rp2040, 1, !led);
+                    didLedLastCycle = true;
+                } else {
+                    didLedLastCycle = false;
+                }
+                break;
+            case 1:
+                    rp2040_set_gpio_value(rp2040, 0, true);
+                    rp2040_set_gpio_value(rp2040, 1, true);
+                break;
+            case 2:
+                    rp2040_set_gpio_value(rp2040, 0, false);
+                    rp2040_set_gpio_value(rp2040, 1, false);
+                break;
         }
     }
 }
